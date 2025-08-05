@@ -11,7 +11,8 @@
 Patch JetBrains IDEs
 
 Usage:
-  main.py --classes=dir <ide-path>...
+  main.py patch --classes=dir <ide-path>...
+  main.py restore <ide-path>...
 
 Options:
   -c PATH --classes=PATH     the root path of modified classes
@@ -102,8 +103,7 @@ def load_patches(classes: dict[str, Class], ide: str) -> set[JarPatch]:
     return res
 
 
-def main():
-    args = docopt(__doc__)
+def run_patch(args):
     classes = load_classes(args["--classes"])
     for path in args["<ide-path>"]:  # type: str
         patches = load_patches(classes.copy(), path)
@@ -116,6 +116,28 @@ def main():
             for patch in patches:
                 logger.info(f"Patching {patch.jar}")
                 patch.patch()
+
+
+def run_restore(args):
+
+    def restore(path: str) -> None:
+        for root, dirs, files in os.walk(path):
+            for file in files:
+                if file.endswith(".jar.orig"):
+                    restored = os.path.join(root, file[: -len(".orig")])
+                    os.rename(os.path.join(root, file), restored)
+                    logger.info(f"Restored {restored}")
+
+    for ide_path in args["<ide-path>"]:  # type: str
+        restore(ide_path)
+
+
+def main():
+    args = docopt(__doc__)
+    if args["patch"]:
+        run_patch(args)
+    elif args["restore"]:
+        run_restore(args)
 
 
 if __name__ == "__main__":
