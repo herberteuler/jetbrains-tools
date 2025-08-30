@@ -65,6 +65,7 @@ class JarPatch(object):
         bak = f"{self.jar}.orig"
         if not os.path.exists(bak):
             os.rename(self.jar, bak)
+            logger.info(f"backed up {self.jar} as {bak}")
         with (
             zipfile.ZipFile(bak, "r") as zin,
             zipfile.ZipFile(
