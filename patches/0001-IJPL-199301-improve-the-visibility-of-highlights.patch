@@ -1,0 +1,47 @@
+From bb56d465edef979eb7be5e141cb20100fd21f5ad Mon Sep 17 00:00:00 2001
+From: Guanpeng Xu <herberteuler@gmail.com>
+Date: Sat, 2 Aug 2025 15:19:03 -0700
+Subject: [PATCH] IJPL-199301: improve the visibility of highlights
+
+This is a personal fix of the following issue:
+
+https://youtrack.jetbrains.com/issue/IJPL-199301/Highlighted-links-too-hard-to-see
+---
+ .../documentation/DocumentationLinkHighlightPainter.java | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/platform/lang-impl/src/com/intellij/codeInsight/documentation/DocumentationLinkHighlightPainter.java b/platform/lang-impl/src/com/intellij/codeInsight/documentation/DocumentationLinkHighlightPainter.java
+index 826eec108e6a..2aebd6b67244 100644
+--- a/platform/lang-impl/src/com/intellij/codeInsight/documentation/DocumentationLinkHighlightPainter.java
++++ b/platform/lang-impl/src/com/intellij/codeInsight/documentation/DocumentationLinkHighlightPainter.java
+@@ -12,7 +12,7 @@ final class DocumentationLinkHighlightPainter implements HighlightPainter {
+ 
+   public static final HighlightPainter INSTANCE = new DocumentationLinkHighlightPainter();
+ 
+-  private static final Stroke STROKE = new BasicStroke(1, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1, new float[]{1}, 0);
++  private static final Stroke STROKE = new BasicStroke(5, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 1, new float[]{8,2}, 0);
+ 
+   private DocumentationLinkHighlightPainter() { }
+ 
+@@ -23,7 +23,7 @@ final class DocumentationLinkHighlightPainter implements HighlightPainter {
+       Graphics2D g2d = (Graphics2D)g.create();
+       try {
+         g2d.setStroke(STROKE);
+-        g2d.setColor(c.getSelectionColor());
++        g2d.setColor(makeDarker(c.getSelectionColor()));
+         g2d.drawRect(target.x, target.y, target.width - 1, target.height - 1);
+       }
+       finally {
+@@ -34,4 +34,9 @@ final class DocumentationLinkHighlightPainter implements HighlightPainter {
+       LOG.warn("Error painting link highlight", e);
+     }
+   }
++
++  private Color makeDarker(Color base) {
++    float[] hsb = Color.RGBtoHSB(base.getRed(), base.getGreen(), base.getBlue(), null);
++    return Color.getHSBColor(hsb[0], hsb[1], hsb[2] * 0.8f);
++  }
+ }
+-- 
+2.49.1
+
