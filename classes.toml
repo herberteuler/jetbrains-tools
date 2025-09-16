@@ -1,0 +1,7 @@
+["lib/app.jar"]
+alias = "lib/app-client.jar"
+classes = [
+    "com/intellij/codeInsight/documentation/DocumentationLinkHighlightPainter.class",
+    "com/intellij/find/actions/ShowUsagesAction*.class",
+    "com/intellij/ide/actions/searcheverywhere/SearchEverywhereHeader*.class",
+]

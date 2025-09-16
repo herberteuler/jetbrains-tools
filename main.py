@@ -3,6 +3,7 @@
 # dependencies = [
 #     "docopt",
 #     "loguru",
+#     "toml",
 # ]
 # ///
 
@@ -11,112 +12,153 @@
 Patch JetBrains IDEs
 
 Usage:
-  main.py patch --classes=dir <ide-path>...
+  main.py copy-classes --conf=classes.toml --classes=dir <root-dir>
+  main.py patch --conf=classes.toml --classes=dir <ide-path>...
   main.py restore <ide-path>...
 
 Options:
-  -c PATH --classes=PATH     the root path of modified classes
+  --classes=PATH             the root path of modified classes
+  --conf=PATH                the class list configuration
 """
 import os
+import re
+import tomllib
 import zipfile
-from typing import NamedTuple, Optional
+from abc import ABC, abstractmethod
+from typing import Iterable
 
 from docopt import docopt
 from loguru import logger
 
 
-class Class(NamedTuple):
-    root: str
-    path: str
-    file: str
+def build_pattern(classes: Iterable[str]) -> re.Pattern:
 
-    @property
-    def abspath(self) -> str:
-        return os.path.join(self.root, self.path, self.file)
+    def to_regex(s: str) -> str:
+        return re.escape(s).replace("\\*", ".*")
 
-    @property
-    def _class(self) -> str:
-        return f"{self.path.replace("/", ".")}.{self.file[: -len(".class")]}"
+    return re.compile(f"({"|".join(map(to_regex, classes))})")
 
 
-def load_classes(classes: str) -> dict[str, Class]:
-    abs_path = os.path.abspath(classes)
-    n = len(classes) + 1
-    res: dict[str, Class] = {}
-    for root, dirs, files in os.walk(classes):
-        for file in files:
-            path = root[n:]
-            res[file] = Class(abs_path, path, file)
-    return res
+def copy_classes(src: str, dst: str, classes: Iterable[str]) -> None:
+    pattern = build_pattern(classes)
+    with zipfile.ZipFile(src, "r") as zf:
+        for item in zf.infolist():
+            if pattern.match(item.filename):
+                f = f"{dst}/{item.filename}"
+                os.makedirs(os.path.dirname(f), exist_ok=True)
+                with open(f, "wb") as out:
+                    out.write(zf.read(item.filename))
+                    logger.info(f"Copied {item.filename}")
 
 
-class JarPatch(object):
-    jar: str
-    classes: dict[str, Class]
+class Copier(ABC):
 
-    def __init__(self, jar: str, classes: dict[str, Class]):
-        self.jar = jar
-        self.classes = classes
+    build_root: str
 
-    def __repr__(self):
-        return f"path: {self.jar}, classes: {self.classes}"
+    def __init__(self, build_root: str) -> None:
+        self.build_root = build_root
 
-    def patch(self):
-        bak = f"{self.jar}.orig"
-        if not os.path.exists(bak):
-            os.rename(self.jar, bak)
-            logger.info(f"backed up {self.jar} as {bak}")
-        with (
-            zipfile.ZipFile(bak, "r") as zin,
-            zipfile.ZipFile(
-                self.jar, "w", compression=zipfile.ZIP_DEFLATED
-            ) as zout,
-        ):
-            for item in zin.infolist():
-                base = os.path.basename(item.filename)
-                cls = self.classes[base] if base in self.classes else None
-                if cls and cls.path == os.path.dirname(item.filename):
-                    with open(self.classes[base].abspath, "rb") as f:
-                        buf = f.read()
-                else:
-                    buf = zin.read(item.filename)
-                zout.writestr(item, buf)
+    @abstractmethod
+    def jar_file(self, name: str) -> str: ...
+
+    def copy_classes(
+        self, jar_name: str, dst: str, classes: Iterable[str]
+    ) -> None:
+        root = f"{dst}/{jar_name}"
+        if not os.path.exists(root):
+            os.makedirs(root)
+        jar = self.jar_file(jar_name)
+        copy_classes(jar, root, classes)
 
 
-def load_patches(classes: dict[str, Class], ide: str) -> set[JarPatch]:
+class DefaultCopier(Copier):
 
-    def check_classes(f: str) -> Optional[JarPatch]:
-        local: dict[str, Class] = {}
-        with zipfile.ZipFile(f, "r") as jar:
-            for name in jar.namelist():
-                base = os.path.basename(name)
-                if base in classes:
-                    local[base] = classes[base]
-                    del classes[base]
-        return None if not local else JarPatch(os.path.abspath(f), local)
+    def jar_file(self, name: str) -> str:
+        return f"{self.build_root}/out/idea-ce/dist.all/{name}"
 
-    res: set[JarPatch] = set()
-    for root, dirs, files in os.walk(ide):
-        for file in files:
-            if file.endswith(".jar"):
-                if p := check_classes(os.path.join(root, file)):
-                    res.add(p)
-    return res
+
+def patch_classes(
+    name: str,
+    src: str,
+    dst: str,
+    classes: Iterable[str],
+    copied_classes_root: str,
+) -> None:
+    prefix = f"{copied_classes_root}/{name}"
+    n = len(prefix)
+    pattern = build_pattern(classes)
+    with (
+        zipfile.ZipFile(src, "r") as zin,
+        zipfile.ZipFile(dst, "w", compression=zipfile.ZIP_DEFLATED) as zout,
+    ):
+        for item in zin.infolist():
+            if pattern.match(item.filename):
+                logger.info(f"Removed {item.filename}")
+            else:
+                zout.writestr(item, zin.read(item.filename))
+        for root, dirs, files in os.walk(copied_classes_root):
+            for file in files:
+                arcname = f"{root[n:]}/{file}"
+                zout.write(f"{root}/{file}", arcname)
+                logger.info(f"Added {arcname}")
+
+
+class Patcher(ABC):
+
+    @abstractmethod
+    def jar_file(self, root: str, name: str, alias: str) -> str: ...
+
+    def patch(
+        self,
+        root: str,
+        name: str,
+        alias: str,
+        classes: Iterable[str],
+        copied_classes_root: str,
+    ) -> None:
+        jar = self.jar_file(root, name, alias)
+        orig = f"{jar}.orig"
+        if not os.path.exists(orig):
+            logger.info(f"backing up {jar} as {orig}")
+            os.rename(jar, orig)
+        patch_classes(name, orig, jar, classes, copied_classes_root)
+
+
+class DefaultPatcher(Patcher):
+
+    def jar_file(self, root: str, name: str, alias: str) -> str:
+        f = f"{root}/{alias}"
+        if os.path.exists(f):
+            return f
+        f = f"{root}/{name}"
+        if os.path.exists(f):
+            return f
+        raise FileNotFoundError(name)
+
+
+def run_copy_classes(args):
+    with open(args["--conf"], "rb") as f:
+        classes = tomllib.load(f)
+    copier = DefaultCopier(args["<root-dir>"])
+    dst = args["--classes"]
+    for jar, info in classes.items():
+        copier.copy_classes(jar, dst, info["classes"])
 
 
 def run_patch(args):
-    classes = load_classes(args["--classes"])
-    for path in args["<ide-path>"]:  # type: str
-        patches = load_patches(classes.copy(), path)
-        if patches:
-            logger.info(f"Files to be patched under {path}:")
-            for patch in patches:
-                logger.info(f"  {patch.jar}:")
-                for _, cls in patch.classes.items():
-                    logger.info(f"    {cls._class}")
-            for patch in patches:
-                logger.info(f"Patching {patch.jar}")
-                patch.patch()
+    with open(args["--conf"], "rb") as f:
+        classes = tomllib.load(f)
+    patcher = DefaultPatcher()
+    classes_root = args["--classes"]
+    for jar, info in classes.items():
+        for root in args["<ide-path>"]:
+            patcher.patch(
+                root,
+                jar,
+                info["alias"],
+                info["classes"],
+                classes_root,
+            )
 
 
 def run_restore(args):
@@ -135,7 +177,9 @@ def run_restore(args):
 
 def main():
     args = docopt(__doc__)
-    if args["patch"]:
+    if args["copy-classes"]:
+        run_copy_classes(args)
+    elif args["patch"]:
         run_patch(args)
     elif args["restore"]:
         run_restore(args)
