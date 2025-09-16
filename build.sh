@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if [[ $# != 3 ]]; then
-    echo Usage: $0 root-dir branch-name patches-dir 1>&2
+if [[ $# != 2 ]]; then
+    echo Usage: $0 root-dir branch-name 1>&2
     exit 1
 fi
 
@@ -9,7 +9,7 @@ REPO_URL=https://github.com/JetBrains/intellij-community.git
 ROOT_DIR=$1
 BRANCH_NAME=$2
 RELEASE=$(echo $BRANCH_NAME | awk -F '[/.]' '{ print $2 }')
-PATCHES_DIR=$3
+PATCHES_DIR=$(readlink -f $(dirname $0)/patches)
 
 set -ex
 
