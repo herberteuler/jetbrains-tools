@@ -4,7 +4,7 @@
     <option name="enabledOnReformat" value="true" />
     <option name="enabledOnSave" value="true" />
     <option name="pathToExecutable" value="/usr/bin/black" />
-    <option name="sdkName" value="uv (patch-jetbrains)" />
+    <option name="sdkName" value="uv (jetbrains-tools)" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="uv (patch-jetbrains)" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="uv (jetbrains-tools)" project-jdk-type="Python SDK" />
 </project>
