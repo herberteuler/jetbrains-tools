@@ -1,14 +1,18 @@
 [project]
 name = "patch-jetbrains"
 version = "0.1.0"
-description = "A utility to patch JetBrains' IDEs with modified classes"
+description = "A utility to manage JetBrains IDE instances"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
-    "black>=25.1.0",
     "docopt>=0.6.2",
     "loguru>=0.7.3",
     "toml>=0.10.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=25.9.0",
 ]
 
 [tool.black]
