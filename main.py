@@ -9,7 +9,7 @@
 
 
 """
-Patch JetBrains IDEs
+JetBrains Tools
 
 Usage:
   main.py copy-classes --conf=classes.toml --classes=dir <root-dir>
@@ -25,7 +25,7 @@ import re
 import tomllib
 import zipfile
 from abc import ABC, abstractmethod
-from typing import Iterable
+from typing import Iterable, cast
 
 from docopt import docopt
 from loguru import logger
@@ -96,7 +96,7 @@ def patch_classes(
                 logger.info(f"Removed {item.filename}")
             else:
                 zout.writestr(item, zin.read(item.filename))
-        for root, dirs, files in os.walk(copied_classes_root):
+        for root, _, files in os.walk(copied_classes_root):
             for file in files:
                 arcname = f"{root[n:]}/{file}"
                 zout.write(f"{root}/{file}", arcname)
@@ -164,14 +164,14 @@ def run_patch(args):
 def run_restore(args):
 
     def restore(path: str) -> None:
-        for root, dirs, files in os.walk(path):
+        for root, _, files in os.walk(path):
             for file in files:
                 if file.endswith(".jar.orig"):
                     restored = os.path.join(root, file[: -len(".orig")])
                     os.rename(os.path.join(root, file), restored)
                     logger.info(f"Restored {restored}")
 
-    for ide_path in args["<ide-path>"]:  # type: str
+    for ide_path in cast(str, args["<ide-path>"]):
         restore(ide_path)
 
 
