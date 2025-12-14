@@ -1,0 +1,127 @@
+From 299b2071f503179b1dc393e005f6acffdfb3ac96 Mon Sep 17 00:00:00 2001
+From: Guanpeng Xu <herberteuler@gmail.com>
+Date: Sat, 13 Dec 2025 17:38:05 -0800
+Subject: [PATCH] Add keyboard shortcuts to Preview Source and Open in Find
+
+---
+ .../find/actions/ShowUsagesAction.java        | 11 ++++++---
+ .../SearchEverywhereHeader.java               | 23 +++++++++++++++----
+ 2 files changed, 26 insertions(+), 8 deletions(-)
+
+diff --git a/platform/lang-impl/src/com/intellij/find/actions/ShowUsagesAction.java b/platform/lang-impl/src/com/intellij/find/actions/ShowUsagesAction.java
+index 20c7f07a4849..107164c4cb28 100644
+--- a/platform/lang-impl/src/com/intellij/find/actions/ShowUsagesAction.java
++++ b/platform/lang-impl/src/com/intellij/find/actions/ShowUsagesAction.java
+@@ -964,7 +964,8 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
+     filteringGroup.add(showOptionsActionGroup);
+     filteringGroup.add(Separator.getInstance());
+ 
+-    filteringGroup.add(new ToggleAction(UsageViewBundle.message("preview.usages.action.text"), null, AllIcons.Actions.PreviewDetailsVertically) {
++    ToggleAction previewAction = new ToggleAction(UsageViewBundle.message("preview.usages.action.text"),
++                                                  null, AllIcons.Actions.PreviewDetailsVertically) {
+       @Override
+       public boolean isSelected(@NotNull AnActionEvent e) {
+         return properties.isValueSet(PREVIEW_PROPERTY_KEY);
+@@ -985,7 +986,11 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
+           showElementUsages(parameters, actionHandler);
+         }
+       }
+-    });
++    };
++    filteringGroup.add(previewAction);
++    KeyStroke keyStroke = KeyStroke.getKeyStroke("alt shift P");
++    ShortcutSet set = new CustomShortcutSet(new KeyboardShortcut(keyStroke, null));
++    previewAction.registerCustomShortcutSet(set, null, usageView);
+ 
+     JPanel northPanel = new JPanel(new GridBagLayout());
+     GridBag gc = new GridBag().nextLine();
+@@ -1762,4 +1767,4 @@ public final class ShowUsagesAction extends AnAction implements PopupAction, Hin
+   public static void setPopupDelayTimeout(int timeout) {
+     ourPopupDelayTimeout = timeout;
+   }
+-}
+\ No newline at end of file
++}
+diff --git a/platform/lang-impl/src/com/intellij/ide/actions/searcheverywhere/SearchEverywhereHeader.java b/platform/lang-impl/src/com/intellij/ide/actions/searcheverywhere/SearchEverywhereHeader.java
+index 53d6bb35f424..8b70fce0d5d7 100644
+--- a/platform/lang-impl/src/com/intellij/ide/actions/searcheverywhere/SearchEverywhereHeader.java
++++ b/platform/lang-impl/src/com/intellij/ide/actions/searcheverywhere/SearchEverywhereHeader.java
+@@ -38,6 +38,7 @@ import java.util.stream.Stream;
+ 
+ import static com.intellij.ide.actions.searcheverywhere.SearchEverywhereFiltersStatisticsCollector.ContributorFilterCollector;
+ import static com.intellij.ide.actions.searcheverywhere.statistics.SearchEverywhereUsageTriggerCollector.getReportableContributorID;
++import static com.intellij.openapi.actionSystem.IdeActions.ACTION_FIND_USAGES;
+ 
+ @ApiStatus.Internal
+ public final class SearchEverywhereHeader {
+@@ -62,11 +63,16 @@ public final class SearchEverywhereHeader {
+     myScopeChangedCallback = scopeChangedCallback;
+     myProject = project;
+     myShortcutSupplier = shortcutSupplier;
+-    myTabs = createTabs(contributors);
++    myTabs = createTabs(contributors, ui);
+     mySelectedTab = myTabs.get(0);
+     myToolbar = createToolbar(showInFindToolWindowAction);
+     header = ExperimentalUI.isNewUI() ? createNewUITabs() : createHeader();
+ 
++    if (showInFindToolWindowAction != null) {
++      AnAction anAction = ActionManager.getInstance().getAction(ACTION_FIND_USAGES);
++      showInFindToolWindowAction.registerCustomShortcutSet(anAction.getShortcutSet(), ui);
++    }
++
+     ApplicationManager.getApplication().getMessageBus().connect(ui).subscribe(AnActionListener.TOPIC, new AnActionListener() {
+       @Override
+       public void afterActionPerformed(@NotNull AnAction action, @NotNull AnActionEvent event, @NotNull AnActionResult result) {
+@@ -183,7 +189,8 @@ public final class SearchEverywhereHeader {
+     return newUIHeaderView.panel;
+   }
+ 
+-  private List<SETab> createTabs(List<SearchEverywhereContributor<?>> contributors) {
++  private List<SETab> createTabs(List<SearchEverywhereContributor<?>> contributors,
++                                 SearchEverywhereUI ui) {
+     List<SETab> result = new ArrayList<>();
+ 
+     contributors = contributors.stream()
+@@ -196,7 +203,7 @@ public final class SearchEverywhereHeader {
+     };
+ 
+     if (contributors.size() > 1) {
+-      result.add(createAllTab(contributors, onChanged));
++      result.add(createAllTab(contributors, onChanged, ui));
+     }
+ 
+     List<SearchEverywhereContributor<?>> separateTabContributors;
+@@ -324,7 +331,8 @@ public final class SearchEverywhereHeader {
+     return new SETab(contributors.getFirst().getSearchProviderId(), contributors.getFirst().getGroupName(), contributors, actions, null);
+   }
+ 
+-  private @NotNull SETab createAllTab(List<? extends SearchEverywhereContributor<?>> contributors, @NotNull Runnable onChanged) {
++  private @NotNull SETab createAllTab(List<? extends SearchEverywhereContributor<?>> contributors, @NotNull Runnable onChanged,
++                                      SearchEverywhereUI ui) {
+     String actionText = IdeUICustomization.getInstance().projectMessage("checkbox.include.non.project.items");
+     PersistentSearchEverywhereContributorFilter<String> filter = createContributorsFilter(contributors);
+     var contributorToEverywhereAction = new IdentityHashMap<SearchEverywhereContributor<?>, SearchEverywhereToggleAction>();
+@@ -336,6 +344,11 @@ public final class SearchEverywhereHeader {
+       }
+     }
+ 
++    AnAction previewAction = new PreviewAction();
++    KeyStroke keyStroke = KeyStroke.getKeyStroke("alt shift P");
++    ShortcutSet set = new CustomShortcutSet(new KeyboardShortcut(keyStroke, null));
++    previewAction.registerCustomShortcutSet(set, ui);
++
+     List<AnAction> actions = List.of(new CheckBoxSearchEverywhereToggleAction(actionText) {
+       final SearchEverywhereManagerImpl seManager = (SearchEverywhereManagerImpl)SearchEverywhereManager.getInstance(myProject);
+ 
+@@ -364,7 +377,7 @@ public final class SearchEverywhereHeader {
+         });
+         onChanged.run();
+       }
+-    }, new PreviewAction(), new SearchEverywhereFiltersAction<>(filter, onChanged, new ContributorFilterCollector()));
++    }, previewAction, new SearchEverywhereFiltersAction<>(filter, onChanged, new ContributorFilterCollector()));
+     return new SETab(SearchEverywhereManagerImpl.ALL_CONTRIBUTORS_GROUP_ID,
+                      IdeBundle.message("searcheverywhere.all.elements.tab.name"),
+                      contributors, actions, filter);
+-- 
+2.51.2
+
