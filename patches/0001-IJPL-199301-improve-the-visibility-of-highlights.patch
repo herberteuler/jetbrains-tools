@@ -1,20 +1,28 @@
-From bb56d465edef979eb7be5e141cb20100fd21f5ad Mon Sep 17 00:00:00 2001
+From b37fd7d725e9b9a37ced7e80969e46c836a5e423 Mon Sep 17 00:00:00 2001
 From: Guanpeng Xu <herberteuler@gmail.com>
-Date: Sat, 2 Aug 2025 15:19:03 -0700
+Date: Wed, 18 Mar 2026 21:45:21 -0700
 Subject: [PATCH] IJPL-199301: improve the visibility of highlights
 
 This is a personal fix of the following issue:
 
 https://youtrack.jetbrains.com/issue/IJPL-199301/Highlighted-links-too-hard-to-see
 ---
- .../documentation/DocumentationLinkHighlightPainter.java | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ .../DocumentationLinkHighlightPainter.java             | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
 diff --git a/platform/lang-impl/src/com/intellij/codeInsight/documentation/DocumentationLinkHighlightPainter.java b/platform/lang-impl/src/com/intellij/codeInsight/documentation/DocumentationLinkHighlightPainter.java
-index 826eec108e6a..2aebd6b67244 100644
+index 2dfe5ebe9f9d..43c7f973d6ce 100644
 --- a/platform/lang-impl/src/com/intellij/codeInsight/documentation/DocumentationLinkHighlightPainter.java
 +++ b/platform/lang-impl/src/com/intellij/codeInsight/documentation/DocumentationLinkHighlightPainter.java
-@@ -12,7 +12,7 @@ final class DocumentationLinkHighlightPainter implements HighlightPainter {
+@@ -5,6 +5,7 @@ import javax.swing.text.Highlighter.HighlightPainter;
+ import javax.swing.text.JTextComponent;
+ import javax.swing.text.Position;
+ import java.awt.BasicStroke;
++import java.awt.Color;
+ import java.awt.Graphics;
+ import java.awt.Graphics2D;
+ import java.awt.Rectangle;
+@@ -17,7 +18,7 @@ final class DocumentationLinkHighlightPainter implements HighlightPainter {
  
    public static final HighlightPainter INSTANCE = new DocumentationLinkHighlightPainter();
  
@@ -23,7 +31,7 @@ index 826eec108e6a..2aebd6b67244 100644
  
    private DocumentationLinkHighlightPainter() { }
  
-@@ -23,7 +23,7 @@ final class DocumentationLinkHighlightPainter implements HighlightPainter {
+@@ -28,7 +29,7 @@ final class DocumentationLinkHighlightPainter implements HighlightPainter {
        Graphics2D g2d = (Graphics2D)g.create();
        try {
          g2d.setStroke(STROKE);
@@ -32,7 +40,7 @@ index 826eec108e6a..2aebd6b67244 100644
          g2d.drawRect(target.x, target.y, target.width - 1, target.height - 1);
        }
        finally {
-@@ -34,4 +34,9 @@ final class DocumentationLinkHighlightPainter implements HighlightPainter {
+@@ -39,4 +40,9 @@ final class DocumentationLinkHighlightPainter implements HighlightPainter {
        LOG.warn("Error painting link highlight", e);
      }
    }
@@ -43,5 +51,5 @@ index 826eec108e6a..2aebd6b67244 100644
 +  }
  }
 -- 
-2.49.1
+2.52.0
 
